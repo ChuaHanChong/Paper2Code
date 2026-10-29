@@ -1,238 +1,96 @@
-# 📄 Paper2Code: Automating Code Generation from Scientific Papers in Machine Learning
+# Paper2Code with Codex and Claude Code
 
-**Minju Seo, Jinheon Baek†, Seongyun Lee, and Sung Ju Hwang†** († denotes equal advising)  
-International Conference on Learning Representations (ICLR), 2026  
-📄 [Read the paper](https://arxiv.org/abs/2504.17192)  
+This fork runs PaperCoder's full paper-to-project workflow through authenticated Codex or Claude Code command-line sessions.
+The four planning substeps, per-file analysis, sequential coding, reproduction script generation, name refinement, debugging, and reference-free/reference-based evaluation remain available.
+Direct model SDKs, provider key configuration, model-specific price estimates, and the duplicate GPU inference implementation have been removed.
+Inference still uses network access and your CLI account's usage allowance.
 
-![PaperCoder Overview](./assets/papercoder_overview.png)
+## Install
 
-**PaperCoder** is the multi-agent LLM system introduced in **Paper2Code**, designed to transform a paper into a code repository.
-It follows a three-stage pipeline: planning, analysis, and code generation, each handled by specialized agents.
-Our method outperforms strong baselines on both Paper2Code and PaperBench and produces faithful, high-quality implementations.
-
----
-
-## 🗺️ Table of Contents
-
-- [⚡ Quick Start](#-quick-start)
-- [📚 Detailed Setup Instructions](#-detailed-setup-instructions)
-- [📦 Paper2Code Benchmark Datasets](#-paper2code-benchmark-datasets)
-- [📊 Model-based Evaluation of Repositories](#-model-based-evaluation-of-repositories-generated-by-papercoder)
-
----
-
-## ⚡ Quick Start
-- Note: The following command runs example paper ([Attention Is All You Need](https://arxiv.org/abs/1706.03762)).  
-- For more setup options, including LaTeX-based inputs and PDF-to-JSON conversion, see [📚 Detailed Setup Instructions](#-detailed-setup-instructions).
-
-### Using OpenAI API
-- 💵 Estimated cost for using o3-mini: $0.50–$0.70
+Python 3.10 or later and a current authenticated `codex` or `claude` executable are required.
 
 ```bash
-pip install openai
-
-export OPENAI_API_KEY="<OPENAI_API_KEY>"
-
-cd scripts
-bash run.sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+codex login
+# Or authenticate Claude Code with: claude auth login
 ```
 
-### Using Open Source Models with vLLM
-- If you encounter any issues installing vLLM, please refer to the [official vLLM repository](https://github.com/vllm-project/vllm).
-- The default model is `deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct`.
+Generation uses a fresh session per stage with the complete role-labelled conversation supplied explicitly.
+Codex runs in a read-only scratch directory with command tools disabled; Claude uses safe mode with built-in tools and MCP disabled while retaining subscription login.
+PaperCoder writes only validated artifacts and generated files itself; it does not execute generated scripts or create commits, PRs, or merges.
+Do not use Claude bare mode: it does not use subscription authentication.
+An inherited nested-session guard is preserved; a rejected nested launch is a failed stage requiring a supported external launcher.
+
+## Run the full workflow
+
+Use a JSON paper (the bundled cleaned GROBID-compatible example) or LaTeX source.
+Raw PDF conversion remains an external preprocessing step using [s2orc-doc2json](https://github.com/allenai/s2orc-doc2json); `codes/0_pdf_process.py` can clean its JSON.
+Inference stages require an explicit `--backend` and a positive finite `--timeout`, validated before CLI calls or output writes.
+Choose that per-stage timeout from measured fixture runtimes on your host; zero, negative, NaN, and infinite budgets are rejected.
+An explicitly supplied `--model` must contain non-whitespace text; model availability is checked by the selected CLI.
 
 ```bash
-pip install vllm
-
-cd scripts
-bash run_llm.sh
+.venv/bin/python codes/pipeline.py \
+  --backend codex \
+  --timeout "$MEASURED_STAGE_TIMEOUT" \
+  --paper_name Transformer \
+  --paper_format JSON \
+  --input examples/Transformer_cleaned.json \
+  --output_dir outputs/Transformer \
+  --output_repo_dir outputs/Transformer_repo
 ```
 
-### Output Folder Structure (Only Important Files)
-```bash
-outputs
-├── Transformer
-│   ├── analyzing_artifacts
-│   ├── coding_artifacts
-│   └── planning_artifacts
-└── Transformer_repo # Final output repository
-```
----
+Use `--backend claude` for Claude Code, `--model MODEL` to select an available model, or `--paper_format LaTeX --input examples/Transformer_cleaned.tex` for LaTeX.
+An unavailable backend or model fails explicitly; providers never switch silently.
+Model-provider key/token environment variables are omitted from child inference processes so saved CLI authentication is used.
+User policy and managed settings remain authoritative.
 
-## 📚 Detailed Setup Instructions
+`bash scripts/run.sh codex "$MEASURED_STAGE_TIMEOUT"` and `run_latex.sh` run the bundled examples.
+Set `PYTHON` to the virtual environment interpreter when using those shell entry points.
+The old GPU inference scripts and `--gpt_version` option are removed; migrate to `--backend` and optional `--model`.
 
-### 🛠️ Environment Setup
+The command emits one JSON result on stdout; stage progress goes to stderr.
+`run.json` records completion/failure, the current stage, completed stages, backend/model selection, CLI version, source revision, input hash, and artifact paths.
+Inspect the manifest and exit status; generated files are not evidence that the run completed.
+Full runs (`--stage all`, the default) require both artifact and project destinations to be absent or empty.
+An occupied destination is rejected before directory creation, CLI version checks, inference, or artifact writes, preserving the earlier `run.json` and generated project.
+Use fresh destinations for another full run; explicit single-stage commands can reuse the required preceding artifacts and retain their existing per-stage validation.
 
-- 💡 To use the `o3-mini` version, make sure you have the latest `openai` package installed.
-- We recommend using a Python virtual environment before installing dependencies.
-- 📦 Install only what you need:
-  - For OpenAI API, install `openai`.
-  - For open-source models, install `vllm`.
-  - If you encounter any issues installing vLLM, please refer to the [official vLLM repository](https://github.com/vllm-project/vllm).
+## Artifacts and stage entry points
 
+- `stages/`: provider-neutral records containing stage, backend/model, CLI version, input hash, and validated output.
+- `planning_trajectories.json`: explicit planning history; named stage records replace fixed conversation positions as the authoritative interface.
+- `planning_config.yaml`, `planning_artifacts/`, `task_list.json`: validated planning outputs.
+- `analyzing_artifacts/` and `coding_artifacts/`: per-file evidence, retaining nested filenames.
+- Output project: `config.yaml`, generated implementation files, and `reproduce.sh`.
 
-```bash
-pip install openai 
-pip install vllm 
-```
+`--stage planning|extract|analyzing|coding|reproduction|refinement|debugging|evaluation` runs an individual stage.
+The original numbered Python entry points select their matching stage and accept the same backend, timeout, input, and output arguments.
+Extraction requires existing planning records, invokes no CLI, and may omit backend and timeout options through either entry point.
+Validation follows the selected `--stage`, so overriding an extraction entry point to an inference stage requires explicit backend and timeout options.
+Later stages require their preceding artifacts.
 
-- Or, if you prefer, you can install all dependencies using `pip`:
+Optional name refinement requires `--stage refinement` plus `--lookup_file` containing a JSON name-to-ID mapping, or install `requirements-lookup.txt` to search Hugging Face.
+Debugging requires `--stage debugging --error_file_name ERROR_LOG --output_repo_dir PROJECT`; missing/ambiguous patch targets fail before mutation, and backups preserve originals.
+Evaluation uses `--stage evaluation --eval_type ref_free|ref_based --generated_n COUNT --target_repo_dir PROJECT`; reference-based evaluation also requires `--gold_repo_dir REFERENCE`.
+Evaluation defaults to eight samples, as upstream; pass `--generated_n 1` for a smoke test.
+For evaluation, an explicit `--target_repo_dir` takes precedence over `--output_repo_dir`.
+`--papercoder` restricts target code to the planned task files and uses `planning_config.yaml` from the artifact directory; without it, all supported source files in the target are evaluated.
+Each evaluation sample is a separate CLI call; failures are counted separately from valid scores.
+Evaluation is model critique, not a substitute for executable acceptance tests or proof of published scientific results.
 
-```bash
-pip install -r requirements.txt
-```
-
-### 📄 (Option) Convert PDF to JSON
-The following process describes how to convert a paper PDF into JSON format.  
-If you have access to the LaTeX source and plan to use it with PaperCoder, you may skip this step and proceed to [🚀 Running PaperCoder](#-running-papercoder).  
-Note: In our experiments, we converted all paper PDFs to JSON format.
-
-1. Clone the `s2orc-doc2json` repository to convert your PDF file into a structured JSON format.  
-   (For detailed configuration, please refer to the [official repository](https://github.com/allenai/s2orc-doc2json).)
-
-```bash
-git clone https://github.com/allenai/s2orc-doc2json.git
-```
-
-2. Run the PDF processing service.
+## Verify
 
 ```bash
-cd ./s2orc-doc2json/grobid-0.7.3
-./gradlew run
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
-3. Convert your PDF into JSON format.
+Offline tests exercise the public command using local fake CLI executables.
+Live acceptance runs must separately verify both real backends, both paper formats, generated behavior, auxiliary stages, and the actual supervising host's nested-launch path.
 
-```bash
-mkdir -p ./s2orc-doc2json/output_dir/paper_coder
-python ./s2orc-doc2json/doc2json/grobid2json/process_pdf.py \
-    -i ${PDF_PATH} \
-    -t ./s2orc-doc2json/temp_dir/ \
-    -o ./s2orc-doc2json/output_dir/paper_coder
-```
+## License and provenance
 
-### 🚀 Running PaperCoder
-- Note: The following command runs example paper ([Attention Is All You Need](https://arxiv.org/abs/1706.03762)).  
-  If you want to run PaperCoder on your own paper, please modify the environment variables accordingly.
-
-#### Using OpenAI API
-- 💵 Estimated cost for using o3-mini: $0.50–$0.70
-
-
-```bash
-# Using the PDF-based JSON format of the paper
-export OPENAI_API_KEY="<OPENAI_API_KEY>"
-
-cd scripts
-bash run.sh
-```
-
-```bash
-# Using the LaTeX source of the paper
-export OPENAI_API_KEY="<OPENAI_API_KEY>"
-
-cd scripts
-bash run_latex.sh
-```
-
-
-#### Using Open Source Models with vLLM
-- The default model is `deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct`.
-
-```bash
-# Using the PDF-based JSON format of the paper
-cd scripts
-bash run_llm.sh
-```
-
-```bash
-# Using the LaTeX source of the paper
-cd scripts
-bash run_latex_llm.sh
-```
-
----
-
-## 📦 Paper2Code Benchmark Datasets
-- Huggingface dataset: [paper2code](https://huggingface.co/datasets/iaminju/paper2code)
-  
-- You can find the description of the Paper2Code benchmark dataset in [data/paper2code](https://github.com/going-doer/Paper2Code/tree/main/data/paper2code). 
-- For more details, refer to Section 4.1 "Paper2Code Benchmark" in the [paper](https://arxiv.org/abs/2504.17192).
-
-
----
-
-## 📊 Model-based Evaluation of Repositories Generated by PaperCoder
-
-- We evaluate repository quality using a model-based approach, supporting both reference-based and reference-free settings.  
-  The model critiques key implementation components, assigns severity levels, and generates a 1–5 correctness score averaged over 8 samples using **o3-mini-high**.
-
-- For more details, please refer to Section 4.3.1 (*Paper2Code Benchmark*) of the paper.
-- **Note:** The following examples evaluate the sample repository (**Transformer_repo**).  
-  Please modify the relevant paths and arguments if you wish to evaluate a different repository.
-
-### 🛠️ Environment Setup
-```bash
-pip install tiktoken
-export OPENAI_API_KEY="<OPENAI_API_KEY>"
-```
-
-
-### 📝 Reference-free Evaluation
-- `target_repo_dir` is the generated repository.
-
-```bash
-cd codes/
-python eval.py \
-    --paper_name Transformer \
-    --pdf_json_path ../examples/Transformer_cleaned.json \
-    --data_dir ../data \
-    --output_dir ../outputs/Transformer \
-    --target_repo_dir ../outputs/Transformer_repo \
-    --eval_result_dir ../results \
-    --eval_type ref_free \
-    --generated_n 8 \
-    --papercoder
-```
-
-### 📝 Reference-based Evaluation
-- `target_repo_dir` is the generated repository.
-- `gold_repo_dir` should point to the official repository (e.g., author-released code).
-
-```bash
-cd codes/
-python eval.py \
-    --paper_name Transformer \
-    --pdf_json_path ../examples/Transformer_cleaned.json \
-    --data_dir ../data \
-    --output_dir ../outputs/Transformer \
-    --target_repo_dir ../outputs/Transformer_repo \
-    --gold_repo_dir ../examples/Transformer_gold_repo \
-    --eval_result_dir ../results \
-    --eval_type ref_based \
-    --generated_n 8 \
-    --papercoder
-```
-
-
-### 📄 Example Output
-```bash
-========================================
-🌟 Evaluation Summary 🌟
-📄 Paper name: Transformer
-🧪 Evaluation type: ref_based
-📁 Target repo directory: ../outputs/Transformer_repo
-📊 Evaluation result:
-        📈 Score: 4.5000
-        ✅ Valid: 8/8
-========================================
-🌟 Usage Summary 🌟
-[Evaluation] Transformer - ref_based
-🛠️ Model: o3-mini
-📥 Input tokens: 44318 (Cost: $0.04874980)
-📦 Cached input tokens: 0 (Cost: $0.00000000)
-📤 Output tokens: 26310 (Cost: $0.11576400)
-💵 Current total cost: $0.16451380
-🪙 Accumulated total cost so far: $0.16451380
-============================================
-```
+Apache-2.0; retain [LICENSE](LICENSE) and upstream notices.
+Original PaperCoder work: Minju Seo, Jinheon Baek, Seongyun Lee, and Sung Ju Hwang, [Paper2Code](https://arxiv.org/abs/2504.17192).
+Original prompts and workflow semantics are retained in `codes/prompts.py`.

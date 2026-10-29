@@ -66,10 +66,10 @@ Example JSON format:
             "gold_file_name": "utils.py",
             "gold_func_name": "calculate_metric",
             "target_file_name": "metric.py",
-            "target_func_name": "f1_at_k"
+            "target_func_name": "f1_at_k",
             "severity_level": "low",
             "critique": "A critique of the target repository's file with reference to the gold repository."
-        },
+        }
     ],
     "score": 2
 }
