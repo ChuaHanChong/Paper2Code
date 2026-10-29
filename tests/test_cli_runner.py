@@ -12,7 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'codes'))
 from cli_runner import run_stage, StageError
 
-SCHEMA = {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text'], 'additionalProperties': False}
+SCHEMA = {'type': 'object', 'properties': {'text': {'type': 'string', 'minLength': 1}}, 'required': ['text'], 'additionalProperties': False}
 
 class CliRunnerTests(unittest.TestCase):
     """Check real subprocess I/O rather than mocking stage internals."""
@@ -50,7 +50,10 @@ class CliRunnerTests(unittest.TestCase):
             ('codex', 'import pathlib,sys; a=sys.argv; pathlib.Path(a[a.index("--output-last-message")+1]).write_text("not json")', 'malformed'),
             ('claude', "print('{\"result\":\"no schema\"}')", 'structured_output'),
             ('claude', "print('{\"is_error\":true,\"structured_output\":{\"text\":\"x\"}}')", 'structured_output'),
+            ('claude', "print('{\"structured_output\":[]}')", 'expected object'),
+            ('claude', "print('{\"structured_output\":{}}')", 'missing required fields'),
             ('claude', "print('{\"structured_output\":{\"text\":3}}')", 'expected string'),
+            ('claude', "print('{\"structured_output\":{\"text\":\"\"}}')", 'empty content'),
             ('claude', "print('{\"structured_output\":{\"text\":\"x\",\"extra\":1}}')", 'unexpected fields'),
         ]
         for backend, code, message in cases:

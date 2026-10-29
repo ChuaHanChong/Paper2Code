@@ -18,13 +18,9 @@ class StageError(RuntimeError):
 def validate_schema(value: Any, schema: dict[str, Any], location: str = 'result') -> None:
     """Validate the JSON-schema subset used by Paper2Code artifacts."""
     kind = schema.get('type')
-    types = {'object': dict, 'array': list, 'string': str, 'integer': int, 'number': (int, float), 'boolean': bool, 'null': type(None)}
-    if kind not in types or not isinstance(value, types[kind]) or (kind in ('integer', 'number') and isinstance(value, bool)):
+    types = {'object': dict, 'string': str}
+    if kind not in types or not isinstance(value, types[kind]):
         raise StageError(f'{location}: expected {kind}')
-    if kind == 'number' and not math.isfinite(value):
-        raise StageError(f'{location}: expected finite number')
-    if 'enum' in schema and value not in schema['enum']:
-        raise StageError(f'{location}: unsupported value')
     if isinstance(value, dict):
         properties = schema.get('properties', {})
         if not set(schema.get('required', [])) <= value.keys():
@@ -34,11 +30,6 @@ def validate_schema(value: Any, schema: dict[str, Any], location: str = 'result'
         for key, child in value.items():
             if key in properties:
                 validate_schema(child, properties[key], f'{location}.{key}')
-    if isinstance(value, list):
-        if len(value) < schema.get('minItems', 0):
-            raise StageError(f'{location}: too few items')
-        for index, child in enumerate(value):
-            validate_schema(child, schema['items'], f'{location}[{index}]')
     if isinstance(value, str) and len(value) < schema.get('minLength', 0):
         raise StageError(f'{location}: empty content')
 
