@@ -1,12 +1,11 @@
-# Standalone acceptance and Super Board verification
+# Standalone acceptance checks
 
-Two independent test layers are required: modified Paper2Code runs standalone through each coding CLI, then Super Board invokes the tested Paper2Code capability through its normal research-card lifecycle.
-The second layer is pending and cannot be replaced by the standalone tests in this directory.
-These checked-in fixtures and the launcher make future standalone runs reproducible; their presence does not replace existing real live results or clear the blocked Claude live gate.
+These small fixtures check real CLI generation and generated behavior separately.
+Live generation is opt-in and uses the selected CLI account's usage allowance; offline tests make no model calls.
 
 ## Generate without executing generated code
 
-`attention.json` and `attention.tex` contain the same complete synthetic specification from `paper.md`.
+`attention.json` and `attention.tex` contain the same complete synthetic specification.
 The JSON follows the bundled Transformer cleaned paper structure; the LaTeX carries the exact specification in a verbatim block and requires no TeX compiler.
 The model must produce `attention.py`, `config.yaml`, and `reproduce.sh` using only the Python standard library in the generated project.
 
@@ -51,4 +50,4 @@ Do not supply `self_check.py` or its reference implementation as generation cont
 Launcher tests use fake coding CLIs and prove result recording, failure recording, evidence preservation, and that generated reproduction commands remain unexecuted.
 
 This small fixture does not establish Transformer training quality, published paper metrics, auxiliary-stage live compatibility, nested host compatibility, or Super Board integration.
-Those checks and the actual host readiness remain separate gates in the integration plan.
+Verify those separately when required by the calling project.

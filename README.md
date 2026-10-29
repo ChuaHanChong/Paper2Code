@@ -1,4 +1,12 @@
-# Paper2Code with Codex and Claude Code
+# 📄 Paper2Code: Automating Code Generation from Scientific Papers in Machine Learning
+
+**Minju Seo, Jinheon Baek†, Seongyun Lee, and Sung Ju Hwang†** († denotes equal advising)
+International Conference on Learning Representations (ICLR), 2026
+📄 [Read the paper](https://arxiv.org/abs/2504.17192)
+
+![PaperCoder Overview](./assets/papercoder_overview.png)
+
+PaperCoder is the system introduced in Paper2Code for generating code repositories from papers.
 
 This fork runs PaperCoder's full paper-to-project workflow through authenticated Codex or Claude Code command-line sessions.
 The four planning substeps, per-file analysis, sequential coding, reproduction script generation, name refinement, debugging, and reference-free/reference-based evaluation remain available.
@@ -87,10 +95,15 @@ Evaluation is model critique, not a substitute for executable acceptance tests o
 ```
 
 Offline tests exercise the public command using local fake CLI executables.
-Live acceptance runs must separately verify both real backends, both paper formats, generated behavior, auxiliary stages, and the actual supervising host's nested-launch path.
+For opt-in live checks, see [the standalone acceptance instructions](tests/acceptance/README.md).
+Verify the backend, input format, generated behavior, and nested-launch path you intend to use separately from the offline tests.
+
+## Paper2Code benchmark datasets
+
+The upstream benchmark is available on [Hugging Face](https://huggingface.co/datasets/iaminju/paper2code), with its [dataset description](https://github.com/going-doer/Paper2Code/tree/main/data/paper2code) and methodology in Section 4.1 of the paper.
+Published benchmark results describe the original PaperCoder experiments, not verified results for this CLI fork.
 
 ## License and provenance
 
 Apache-2.0; retain [LICENSE](LICENSE) and upstream notices.
-Original PaperCoder work: Minju Seo, Jinheon Baek, Seongyun Lee, and Sung Ju Hwang, [Paper2Code](https://arxiv.org/abs/2504.17192).
 Original prompts and workflow semantics are retained in `codes/prompts.py`.

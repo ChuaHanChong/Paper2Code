@@ -16,5 +16,3 @@ All inference entry points share `run_stage`; no provider response object crosse
 OpenAI-shaped response dumps, price/token logging, and vLLM entry points are removed rather than emulated.
 Fixed conversation indexes are replaced by named stage records; consumers migrate together.
 The explicit full-run interface is `codes/pipeline.py`; stage wrappers preserve individual entry-point functionality.
-
-Test seams agreed in the implementation plan: public CLI stage runner and complete paper-to-project command, followed by separate live backend and Board integration gates.
