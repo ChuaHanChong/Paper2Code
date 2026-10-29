@@ -69,6 +69,9 @@ def run_stage(backend: str, messages: list[dict[str, str]], schema: dict[str, An
         output_path = scratch / 'result.json'
         schema_path.write_text(json.dumps(schema), encoding='utf-8')
         if backend == 'codex':
+            state_path = scratch / 'state'
+            state_path.mkdir()
+            environment['CODEX_SQLITE_HOME'] = str(state_path)
             # https://learn.chatgpt.com/docs/non-interactive-mode: -o is the final artifact, not JSONL events.
             command = ['codex', 'exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'read-only', '-c', 'approval_policy="never"', '-c', 'features.shell_tool=false', '-c', 'features.apps=false', '-c', 'features.hooks=false', '-c', 'features.multi_agent=false', '-c', 'features.remote_plugin=false', '--disable', 'view_image', '-c', 'web_search="disabled"', '--output-schema', str(schema_path), '--output-last-message', str(output_path)]
             if model:

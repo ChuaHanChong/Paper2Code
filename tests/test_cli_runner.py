@@ -105,6 +105,55 @@ print(json.dumps({'structured_output':{'text':'safe'}}))
                 with self.assertRaisesRegex(StageError, 'executable unavailable'):
                     run_stage('codex', [{'role':'user','content':'hello'}], SCHEMA, Path(temporary), 10)
 
+    def test_codex_state_is_private_and_removed_after_each_stage(self) -> None:
+        """Keep Codex SQLite writes inside disposable scratch, preserving login."""
+        with tempfile.TemporaryDirectory(prefix='paper coder ') as temporary:
+            root = Path(temporary).resolve()
+            capture = root / 'scratch.json'
+            inherited_state = root / 'caller-state'
+            login = root / 'saved-login'
+            executable = root / 'codex'
+            code = '''import json,os,pathlib,sys
+scratch=pathlib.Path.cwd().resolve()
+state=pathlib.Path(os.environ['CODEX_SQLITE_HOME']).resolve()
+assert scratch.name.startswith('paper2code-stage-')
+assert state.is_dir() and state.parent==scratch
+assert os.environ['CODEX_HOME']==os.environ['STAGE_TEST_LOGIN']
+(state/'state.sqlite').write_text('stage-only')
+pathlib.Path(os.environ['STAGE_TEST_CAPTURE']).write_text(json.dumps(str(scratch)))
+a=sys.argv
+output=pathlib.Path(a[a.index('--output-last-message')+1])
+'''
+            environment = {'PATH': str(root) + os.pathsep + os.environ['PATH'], 'CODEX_SQLITE_HOME': str(inherited_state), 'CODEX_HOME': str(login), 'STAGE_TEST_LOGIN': str(login), 'STAGE_TEST_CAPTURE': str(capture)}
+            success = "output.write_text(json.dumps({'text':'isolated'}))"
+            cases = [(success, None), (success, None), ('raise SystemExit(7)', 'exited 7'), ("output.write_text('not json')", 'malformed'), ("output.write_text(json.dumps({'text':3}))", 'expected string'), ('import time; time.sleep(60)', 'timed out')]
+            scratches = set()
+            for ending, error in cases:
+                with self.subTest(ending=ending):
+                    executable.write_text('#!/usr/bin/env python3\n' + code + ending)
+                    executable.chmod(0o755)
+                    capture.unlink(missing_ok=True)
+                    with patch.dict(os.environ, environment):
+                        if error:
+                            with self.assertRaisesRegex(StageError, error):
+                                run_stage('codex', [{'role':'user','content':'hello'}], SCHEMA, root, 10)
+                        else:
+                            self.assertEqual(run_stage('codex', [{'role':'user','content':'hello'}], SCHEMA, root, 10), {'text':'isolated'})
+                        self.assertEqual(os.environ['CODEX_SQLITE_HOME'], str(inherited_state))
+                    scratch = Path(json.loads(capture.read_text()))
+                    self.assertNotIn(scratch, scratches)
+                    scratches.add(scratch)
+                    self.assertFalse(scratch.exists())
+                    self.assertFalse(inherited_state.exists())
+
+    def test_claude_does_not_receive_a_codex_state_override(self) -> None:
+        """Leave the Claude subprocess environment unchanged by Codex state isolation."""
+        with patch.dict(os.environ):
+            os.environ.pop('CODEX_SQLITE_HOME', None)
+            self.assertEqual(self.run_fake('claude', 'import os\nassert "CODEX_SQLITE_HOME" not in os.environ\nprint(\'{"structured_output":{"text":"unchanged"}}\')'), {'text':'unchanged'})
+        with patch.dict(os.environ, {'CODEX_SQLITE_HOME':'caller-state'}):
+            self.assertEqual(self.run_fake('claude', 'import os\nassert os.environ["CODEX_SQLITE_HOME"]=="caller-state"\nprint(\'{"structured_output":{"text":"unchanged"}}\')'), {'text':'unchanged'})
+
     def test_timeout_is_an_explicit_failure(self) -> None:
         """Stop an unresponsive stage using a caller-supplied test deadline."""
         with self.assertRaisesRegex(StageError, 'timed out'):
