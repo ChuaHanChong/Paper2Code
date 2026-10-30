@@ -77,8 +77,8 @@ def fenced_text(text: str, language: str = '', filename: str | None = None) -> s
             raise StageError(f'incomplete {language or "content"} artifact fence')
         end = opening.end() + closing.start()
         remainder = text[opening.end() + closing.end():]
-        if remainder.strip():
-            raise StageError('multiple or mixed outer artifact fences are ambiguous')
+        if '```' in remainder:  # claude may append fence-free notes after the one artifact fence
+            raise StageError('multiple artifact fences are ambiguous')
         content = text[opening.end():end]
         return content if content.endswith('\n') else content + '\n'
     if markdown:
@@ -94,7 +94,7 @@ def json_content(text: str) -> dict[str, Any]:
     """Parse a stage's JSON object without heuristic repairs."""
     stripped = re.sub(r'^\s*\[CONTENT\]|\[/CONTENT\]\s*$', '', text).strip()
     try:
-        value = json.loads(fenced_text(stripped))
+        value = json.loads(fenced_text(stripped), strict=False)  # prompt format examples show raw newlines inside strings
     except json.JSONDecodeError as error:
         raise StageError('stage content is not valid JSON') from error
     if not isinstance(value, dict):

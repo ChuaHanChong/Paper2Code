@@ -186,6 +186,13 @@ class PipelineTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode,0,result.stdout)
                 self.assertFalse((root/'project').exists())
 
+    def test_claude_output_formats_parse(self) -> None:
+        """Accept notes after one code fence and raw newlines inside planning JSON strings."""
+        sys.path.insert(0, str(KIT/'codes'))
+        from pipeline import fenced_text, json_content
+        self.assertEqual(fenced_text('```python\nx = 1\n```\nNotes: x is one.', filename='a.py'), 'x = 1\n')
+        self.assertEqual(json_content('[CONTENT]\n{"flow": "\nA\n"}\n[/CONTENT]'), {'flow': '\nA\n'})
+
     def test_markdown_artifacts_preserve_inner_code_fences(self) -> None:
         """Generate README content with valid nested fences or explicit raw Markdown context."""
         markdown = '# Affine guide\n\nRun this code:\n\n```python\nfrom model import transform\nprint(transform(3))\n```\n\n```bash\npython3 model.py\n```\n'
