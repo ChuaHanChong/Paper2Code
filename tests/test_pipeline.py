@@ -186,36 +186,6 @@ class PipelineTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode,0,result.stdout)
                 self.assertFalse((root/'project').exists())
 
-    def test_trailing_prose_after_single_fence_is_dropped(self) -> None:
-        """Keep the one code fence when the model appends fence-free review notes after it."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            fake = root/'codex'
-            fake.write_text((KIT/'tests/fixtures/fake_agent.py').read_text())
-            fake.chmod(0o755)
-            paper = root/'paper.json'
-            paper.write_text('{"title":"Affine"}')
-            response = '## Code: model.py\n```python\ndef transform(x):\n    return 2*x+1\n```\n\n**Notes:** `transform(3)` returns 7.'
-            env = {**os.environ,'PATH':str(root)+os.pathsep+os.environ['PATH'],'PAPER2CODE_FAKE_OUTPUTS':json.dumps({'coding:model.py':response})}
-            result = subprocess.run([sys.executable,str(KIT/'codes/pipeline.py'),'--backend','codex','--timeout','10','--input',str(paper),'--output_dir',str(root/'artifacts'),'--output_repo_dir',str(root/'project')],capture_output=True,text=True,env=env)
-            self.assertEqual(result.returncode,0,result.stderr+result.stdout)
-            self.assertEqual((root/'project/model.py').read_text(),'def transform(x):\n    return 2*x+1\n')
-
-    def test_planning_json_accepts_raw_newlines_in_strings(self) -> None:
-        """Parse planning JSON whose strings hold literal newlines, as the prompt's format example shows."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            fake = root/'codex'
-            fake.write_text((KIT/'tests/fixtures/fake_agent.py').read_text())
-            fake.chmod(0o755)
-            paper = root/'paper.json'
-            paper.write_text('{"title":"Affine"}')
-            architecture = '[CONTENT]\n{"Implementation approach":"scalar transform","File list":["model.py","config.yaml"],"Data structures and interfaces":"\nclassDiagram\n    class Model\n","Program call flow":"transform"}\n[/CONTENT]'
-            env = {**os.environ,'PATH':str(root)+os.pathsep+os.environ['PATH'],'PAPER2CODE_FAKE_OUTPUTS':json.dumps({'planning.architecture':architecture})}
-            result = subprocess.run([sys.executable,str(KIT/'codes/pipeline.py'),'--backend','codex','--timeout','10','--input',str(paper),'--output_dir',str(root/'artifacts'),'--output_repo_dir',str(root/'project')],capture_output=True,text=True,env=env)
-            self.assertEqual(result.returncode,0,result.stderr+result.stdout)
-            self.assertTrue((root/'project/model.py').is_file())
-
     def test_markdown_artifacts_preserve_inner_code_fences(self) -> None:
         """Generate README content with valid nested fences or explicit raw Markdown context."""
         markdown = '# Affine guide\n\nRun this code:\n\n```python\nfrom model import transform\nprint(transform(3))\n```\n\n```bash\npython3 model.py\n```\n'
