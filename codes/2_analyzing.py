@@ -186,7 +186,7 @@ for todo_file_name in tqdm(todo_file_lst):
     total_accumulated_cost = temp_total_accumulated_cost
 
     # save
-    with open(f'{artifact_output_dir}/{todo_file_name}_simple_analysis.txt', 'w') as f:
+    with open(f'{artifact_output_dir}/{todo_file_name.replace("/", "_")}_simple_analysis.txt', 'w') as f:
         f.write(completion_json['choices'][0]['message']['content'])
 
 
