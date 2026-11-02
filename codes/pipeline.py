@@ -137,7 +137,6 @@ class Pipeline:
         self.records: list[dict[str, Any]] = []
         self.cli_version: str | None = None
         self.revision: str | None = None
-        self.arguments: argparse.Namespace
 
     def text_stage(self, stage: str, messages: list[dict[str, str]]) -> str:
         """Generate text and persist its provider-neutral stage record."""
@@ -289,11 +288,8 @@ class Pipeline:
             if stage == 'all':
                 for operation in (self.planning,self.analyzing,self.coding,self.reproduction):
                     operation()
-            elif stage in ('planning','extract','analyzing','coding','reproduction'):
-                getattr(self,stage)()
             else:
-                from auxiliary import run_auxiliary
-                run_auxiliary(self,stage)
+                getattr(self,stage)()
             status = 'completed'
         except (StageError, ValueError, OSError, json.JSONDecodeError, subprocess.SubprocessError) as failure:
             error = str(failure)
@@ -302,8 +298,8 @@ class Pipeline:
         return result
 
 
-def parse_args(default_stage: str = 'all') -> argparse.Namespace:
-    """Parse one provider-neutral command for standalone and legacy entry points."""
+def parse_args() -> argparse.Namespace:
+    """Parse one provider-neutral command."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend',choices=['codex','claude'])
     parser.add_argument('--model')
@@ -311,22 +307,9 @@ def parse_args(default_stage: str = 'all') -> argparse.Namespace:
     parser.add_argument('--paper_name',default='paper')
     parser.add_argument('--paper_format',choices=['JSON','LaTeX'],default='JSON')
     parser.add_argument('--input',type=Path)
-    parser.add_argument('--pdf_json_path',type=Path)
-    parser.add_argument('--pdf_latex_path',type=Path)
     parser.add_argument('--output_dir',type=Path,required=True)
     parser.add_argument('--output_repo_dir',type=Path)
-    parser.add_argument('--stage',default=default_stage,choices=['all','planning','extract','analyzing','coding','reproduction','refinement','debugging','evaluation'])
-    parser.add_argument('--error_file_name',type=Path)
-    parser.add_argument('--save_num',type=int,default=1)
-    parser.add_argument('--eval_type',choices=['ref_free','ref_based'],default='ref_free')
-    parser.add_argument('--generated_n',type=int,default=8)
-    parser.add_argument('--gold_repo_dir',type=Path)
-    parser.add_argument('--selected_file_path',type=Path,help='Optional newline-separated reference filenames for evaluation.')
-    parser.add_argument('--target_repo_dir',type=Path)
-    parser.add_argument('--eval_result_dir',type=Path)
-    parser.add_argument('--data_dir',type=Path)
-    parser.add_argument('--papercoder',action='store_true')
-    parser.add_argument('--lookup_file',type=Path,help='Controlled model/dataset ID lookup JSON; otherwise query Hugging Face.')
+    parser.add_argument('--stage',default='all',choices=['all','planning','extract','analyzing','coding','reproduction'])
     arguments = parser.parse_args()
     if arguments.stage != 'extract' and arguments.backend is None:
         parser.error('--backend is required for inference stages')
@@ -339,24 +322,22 @@ def parse_args(default_stage: str = 'all') -> argparse.Namespace:
     return arguments
 
 
-def main(default_stage: str = 'all') -> int:
+def main() -> int:
     """Run the requested workflow and emit one machine-readable result."""
     logging.basicConfig(level=logging.INFO,stream=sys.stderr)
-    args = parse_args(default_stage)
-    source = args.input or (args.pdf_json_path if args.paper_format=='JSON' else args.pdf_latex_path)
+    args = parse_args()
+    source = args.input
     try:
         content = source.read_text(encoding='utf-8') if source else ''
-        if args.stage in ('all','planning','analyzing','coding','evaluation') and not content.strip():
-            raise StageError('provide --input or the matching --pdf_json_path/--pdf_latex_path')
+        if args.stage in ('all','planning','analyzing','coding') and not content.strip():
+            raise StageError('provide --input')
         if source and args.paper_format=='JSON':
             parsed = json.loads(content)
             if not isinstance(parsed,dict):
                 raise StageError('JSON paper must be an object')
-        project = args.target_repo_dir if args.stage == 'evaluation' and args.target_repo_dir else args.output_repo_dir or args.target_repo_dir or args.output_dir/'project'
+        project = args.output_repo_dir or args.output_dir/'project'
         config = RunConfig(args.backend or 'none',args.timeout if args.timeout is not None else 0,args.model,args.output_dir.resolve(),project.resolve(),args.paper_name,args.paper_format,content)  # Extraction-only sentinels cannot invoke inference.
-        pipeline = Pipeline(config)
-        pipeline.arguments = args
-        result = pipeline.run(args.stage)
+        result = Pipeline(config).run(args.stage)
         print(json.dumps(result))
         return 0 if result['status']=='completed' else 1
     except (StageError,ValueError,OSError) as error:

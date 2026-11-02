@@ -20,10 +20,6 @@ outputs = {
     'analysis:model.py': 'Return scale*x+bias; x=3 yields 7.',
     'coding:model.py': '```python\ndef transform(x):\n    return 2*x+1\n```',
     'reproduction': '```bash\n#!/bin/sh\npython3 -c "from model import transform; assert transform(3)==7"\n```',
-    'refinement': '["example-model"]',
-    'debugging': 'Filename: model.py\n<<<<<<< SEARCH\n    return 0\n=======\n    return 2*x+1\n>>>>>>> REPLACE',
-    'evaluation:ref_free:0': '{"score":5,"critique_list":[]}',
-    'evaluation:ref_based:0': '{"score":5,"critique_list":[]}',
 }
 if stage.startswith(('analysis:', 'coding:')):
     assert 'Return 2*x+1' in str(messages), 'task context missing'

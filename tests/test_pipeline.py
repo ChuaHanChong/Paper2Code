@@ -261,7 +261,7 @@ class PipelineTests(unittest.TestCase):
             env = {**os.environ,'PATH':str(root)+os.pathsep+os.environ['PATH'],'CLI_CALL_LOG':str(calls)}
             cases = [(KIT/'codes/pipeline.py',['--backend','codex','--timeout='+budget]) for budget in ('0','-1','nan','inf','-inf')]
             cases.extend((KIT/'codes/pipeline.py',['--backend','codex','--timeout','10','--model',model]) for model in ('',' ','\t'))
-            cases.extend((KIT/'codes/1.1_extract_config.py',['--stage','planning',*options]) for options in ([],['--backend','codex'],['--timeout','10']))
+            cases.extend((KIT/'codes/pipeline.py',['--stage','planning',*options]) for options in ([],['--backend','codex'],['--timeout','10']))
             for index,(entrypoint,options) in enumerate(cases):
                 with self.subTest(options=options):
                     output = root/f'artifacts-{index}'
@@ -273,7 +273,7 @@ class PipelineTests(unittest.TestCase):
                     self.assertFalse(project.exists())
 
     def test_actual_extraction_stage_needs_no_backend_or_budget(self) -> None:
-        """Permit generic and legacy extraction entry points to reuse records without CLI access."""
+        """Permit extraction to reuse records without CLI access."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             fake = root/'codex'
@@ -287,12 +287,10 @@ class PipelineTests(unittest.TestCase):
             result = subprocess.run([sys.executable,str(KIT/'codes/pipeline.py'),'--backend','codex','--timeout','10','--input',str(paper),'--output_dir',str(output),'--output_repo_dir',str(project)],capture_output=True,text=True,env=env)
             self.assertEqual(result.returncode,0,result.stderr+result.stdout)
             original_calls = calls.read_bytes()
-            for entrypoint,options in ((KIT/'codes/pipeline.py',['--stage','extract']),(KIT/'codes/1.1_extract_config.py',[])):
-                with self.subTest(entrypoint=entrypoint.name):
-                    result = subprocess.run([sys.executable,str(entrypoint),*options,'--output_dir',str(output),'--output_repo_dir',str(project)],capture_output=True,text=True,env=env)
-                    self.assertEqual(result.returncode,0,result.stderr+result.stdout)
-                    self.assertEqual(json.loads(result.stdout)['stage'],'extract')
-                    self.assertEqual(calls.read_bytes(),original_calls)
+            result = subprocess.run([sys.executable,str(KIT/'codes/pipeline.py'),'--stage','extract','--output_dir',str(output),'--output_repo_dir',str(project)],capture_output=True,text=True,env=env)
+            self.assertEqual(result.returncode,0,result.stderr+result.stdout)
+            self.assertEqual(json.loads(result.stdout)['stage'],'extract')
+            self.assertEqual(calls.read_bytes(),original_calls)
 
 if __name__ == '__main__':
     unittest.main()

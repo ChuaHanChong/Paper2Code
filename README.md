@@ -9,7 +9,8 @@ International Conference on Learning Representations (ICLR), 2026
 PaperCoder is the system introduced in Paper2Code for generating code repositories from papers.
 
 This fork runs PaperCoder's full paper-to-project workflow through authenticated Codex or Claude Code command-line sessions.
-The four planning substeps, per-file analysis, sequential coding, reproduction script generation, name refinement, debugging, and reference-free/reference-based evaluation remain available.
+The four planning substeps, per-file analysis, sequential coding, and reproduction script generation remain available.
+Name refinement, debugging, and evaluation are removed; use the upstream repository for them.
 Direct model SDKs, provider key configuration, model-specific price estimates, and the duplicate GPU inference implementation have been removed.
 Inference still uses network access and your CLI account's usage allowance.
 
@@ -73,20 +74,9 @@ Use fresh destinations for another full run; explicit single-stage commands can 
 - `analyzing_artifacts/` and `coding_artifacts/`: per-file evidence, retaining nested filenames.
 - Output project: `config.yaml`, generated implementation files, and `reproduce.sh`.
 
-`--stage planning|extract|analyzing|coding|reproduction|refinement|debugging|evaluation` runs an individual stage.
-The original numbered Python entry points select their matching stage and accept the same backend, timeout, input, and output arguments.
-Extraction requires existing planning records, invokes no CLI, and may omit backend and timeout options through either entry point.
-Validation follows the selected `--stage`, so overriding an extraction entry point to an inference stage requires explicit backend and timeout options.
+`--stage planning|extract|analyzing|coding|reproduction` runs an individual stage.
+Extraction requires existing planning records, invokes no CLI, and may omit backend and timeout options.
 Later stages require their preceding artifacts.
-
-Optional name refinement requires `--stage refinement` plus `--lookup_file` containing a JSON name-to-ID mapping, or install `requirements-lookup.txt` to search Hugging Face.
-Debugging requires `--stage debugging --error_file_name ERROR_LOG --output_repo_dir PROJECT`; missing/ambiguous patch targets fail before mutation, and backups preserve originals.
-Evaluation uses `--stage evaluation --eval_type ref_free|ref_based --generated_n COUNT --target_repo_dir PROJECT`; reference-based evaluation also requires `--gold_repo_dir REFERENCE`.
-Evaluation defaults to eight samples, as upstream; pass `--generated_n 1` for a smoke test.
-For evaluation, an explicit `--target_repo_dir` takes precedence over `--output_repo_dir`.
-`--papercoder` restricts target code to the planned task files and uses `planning_config.yaml` from the artifact directory; without it, all supported source files in the target are evaluated.
-Each evaluation sample is a separate CLI call; failures are counted separately from valid scores.
-Evaluation is model critique, not a substitute for executable acceptance tests or proof of published scientific results.
 
 ## Verify
 
@@ -95,7 +85,6 @@ Evaluation is model critique, not a substitute for executable acceptance tests o
 ```
 
 Offline tests exercise the public command using local fake CLI executables.
-For opt-in live checks, see [the standalone acceptance instructions](tests/acceptance/README.md).
 Verify the backend, input format, generated behavior, and nested-launch path you intend to use separately from the offline tests.
 
 ## Paper2Code benchmark datasets
