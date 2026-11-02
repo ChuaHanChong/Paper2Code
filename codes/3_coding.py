@@ -1,4 +1,4 @@
-from openai import OpenAI
+from cli_client import make_client
 import json
 import os
 from tqdm import tqdm
@@ -19,7 +19,7 @@ parser.add_argument('--output_dir',type=str, default="")
 parser.add_argument('--output_repo_dir',type=str, default="")
 
 args    = parser.parse_args()
-client = OpenAI(api_key = os.environ["OPENAI_API_KEY"])
+client = make_client()
 
 paper_name = args.paper_name
 gpt_version = args.gpt_version

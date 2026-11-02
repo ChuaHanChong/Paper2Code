@@ -37,6 +37,17 @@ cd scripts
 bash run.sh
 ```
 
+### Using Claude Code or Codex CLI
+Use a logged-in `claude` or `codex` instead of an API key. No API key or `openai` package is needed.
+
+```bash
+pip install tqdm pyyaml
+cd scripts
+PAPER2CODE_BACKEND=claude bash run.sh   # or PAPER2CODE_BACKEND=codex
+```
+
+The CLI's default model is used; set `PAPER2CODE_MODEL` to choose another (`--gpt_version` is ignored). Cost logs are skipped. All stages work the same way, including refinement, debugging and evaluation (which also need `huggingface_hub` and `tiktoken`).
+
 ### Using Open Source Models with vLLM
 - If you encounter any issues installing vLLM, please refer to the [official vLLM repository](https://github.com/vllm-project/vllm).
 - The default model is `deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct`.

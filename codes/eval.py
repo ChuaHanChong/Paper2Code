@@ -1,4 +1,4 @@
-from openai import OpenAI
+from cli_client import make_client
 import json
 import os
 import sys
@@ -6,7 +6,7 @@ import argparse
 from utils import read_python_files, extract_planning, content_to_json, \
         num_tokens_from_messages, read_all_files, extract_json_from_string, get_now_str, print_log_cost
 
-client = OpenAI(api_key = os.environ["OPENAI_API_KEY"])
+client = make_client()
 
 def api_call(request_json):
     completion = client.chat.completions.create(**request_json)
@@ -50,7 +50,7 @@ def main(args):
 
         todo_file_lst = task_list['Task list']        
         for todo_file in todo_file_lst:
-            if todo_file.endswith(".yaml"):
+            if todo_file not in target_files_dict:  # the planner may also list non-Python files
                 continue
             codes += f"```python\n## File name: {todo_file}\n{target_files_dict[todo_file]}\n```\n\n"
 

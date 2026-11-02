@@ -285,6 +285,9 @@ def print_response(completion_json, is_llm=False):
     print("============================================\n")
 
 def print_log_cost(completion_json, gpt_version, current_stage, output_dir, total_accumulated_cost):
+    if 'usage' not in completion_json:  # CLI backends report no usage or price
+        return total_accumulated_cost
+
     usage_info = cal_cost(completion_json, gpt_version)
 
     current_cost = usage_info['total_cost']
