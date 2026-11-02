@@ -1,4 +1,4 @@
-from openai import OpenAI
+from cli_client import make_client
 import json
 import os
 from tqdm import tqdm
@@ -18,7 +18,7 @@ parser.add_argument('--output_dir',type=str, default="")
 parser.add_argument('--output_repo_dir',type=str, default="")
 
 args    = parser.parse_args()
-client = OpenAI(api_key = os.environ["OPENAI_API_KEY"])
+client = make_client()
 
 paper_name = args.paper_name
 gpt_version = args.gpt_version
@@ -122,7 +122,7 @@ os.makedirs(artifact_output_dir, exist_ok=True)
 python_dict = read_python_files(output_repo_dir)
 
 for todo_idx, todo_file_name in enumerate(tqdm(todo_file_lst)):
-    if todo_file_name == "config.yaml":
+    if todo_file_name not in python_dict:  # the planner may also list non-Python files
         continue
     
     done_file_dict[todo_file_name] = python_dict[todo_file_name]
