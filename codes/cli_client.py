@@ -1,4 +1,4 @@
-"""Pick the OpenAI API or an authenticated Codex or Claude Code CLI as the chat client."""
+"""Pick the OpenAI API or an authenticated Codex, Claude Code or OpenCode CLI as the chat client."""
 import json
 import os
 from pathlib import Path
@@ -11,13 +11,13 @@ INSTRUCTION = 'Complete the final request in this conversation. Reply with only 
 
 
 def make_client():
-    """Return the client selected by PAPER2CODE_BACKEND: openai (default), codex or claude."""
+    """Return the client selected by PAPER2CODE_BACKEND: openai (default), codex, claude or opencode."""
     backend = os.environ.get('PAPER2CODE_BACKEND', 'openai')
     if backend == 'openai':
         from openai import OpenAI
         return OpenAI(api_key=os.environ['OPENAI_API_KEY'])
-    if backend not in ('codex', 'claude'):
-        raise ValueError(f'PAPER2CODE_BACKEND must be openai, codex or claude, not {backend!r}')
+    if backend not in ('codex', 'claude', 'opencode'):
+        raise ValueError(f'PAPER2CODE_BACKEND must be openai, codex, claude or opencode, not {backend!r}')
     return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **request: create(backend, **request))))
 
 
@@ -42,6 +42,10 @@ def run_cli(backend: str, messages: list) -> str:
             environment['CODEX_SQLITE_HOME'] = scratch  # A lane sandbox cannot write the global state database.
             # https://learn.chatgpt.com/docs/non-interactive-mode: -o is the final message, not JSONL events.
             command = ['codex', 'exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'read-only', '-c', 'approval_policy="never"', '-c', 'features.shell_tool=false', '-c', 'features.apps=false', '-c', 'features.hooks=false', '-c', 'features.multi_agent=false', '-c', 'features.remote_plugin=false', '--disable', 'view_image', '-c', 'web_search="disabled"', '--output-last-message', str(output)]
+        elif backend == 'opencode':
+            # https://opencode.ai/docs/permissions: `run` writes files by default; explicit deny rules hold.
+            environment['OPENCODE_CONFIG_CONTENT'] = json.dumps({'permission': 'deny'})
+            command = ['opencode', 'run', '--format', 'json', '--standalone']
         else:
             # https://code.claude.com/docs/en/headless: safe mode keeps the saved login; bare mode does not.
             command = ['claude', '--safe-mode', '--restricted', '--tools', '', '--strict-mcp-config', '--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--no-session-persistence', '-p', '--output-format', 'json']
@@ -54,7 +58,27 @@ def run_cli(backend: str, messages: list) -> str:
             raise RuntimeError(f'{backend} exited {result.returncode}: {result.stderr[-2000:] or result.stdout[-2000:]}')
         if backend == 'codex':
             return output.read_text(encoding='utf-8')
+        if backend == 'opencode':
+            return opencode_reply(result.stdout)
         reply = json.loads(result.stdout)
         if reply.get('is_error') or not isinstance(reply.get('result'), str):
             raise RuntimeError(f'claude returned no reply: {result.stdout[-2000:]}')
         return reply['result']
+
+
+def opencode_reply(stdout: str) -> str:
+    """Return the last text event of `opencode run --format json`, raising on an error event or no text."""
+    texts = []
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(event, dict) and event.get('type') == 'error':
+            raise RuntimeError(f'opencode failed: {line[-2000:]}')
+        part = event.get('part') if isinstance(event, dict) else None
+        if isinstance(part, dict) and part.get('type') == 'text' and isinstance(part.get('text'), str):
+            texts.append(part['text'])
+    if not texts:
+        raise RuntimeError(f'opencode returned no reply: {stdout[-2000:]}')
+    return texts[-1]
