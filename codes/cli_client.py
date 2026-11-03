@@ -45,6 +45,9 @@ def run_cli(backend: str, messages: list) -> str:
         elif backend == 'opencode':
             # https://opencode.ai/docs/permissions: `run` writes files by default; explicit deny rules hold.
             environment['OPENCODE_CONFIG_CONTENT'] = json.dumps({'permission': 'deny'})
+            # https://opencode.ai/docs/cli: plugins and global AGENTS.md otherwise leak into every reply; the login lives in the data dir.
+            environment.update(XDG_CONFIG_HOME=scratch, OPENCODE_PURE='1', OPENCODE_DISABLE_PROJECT_CONFIG='1',
+                               OPENCODE_DISABLE_CLAUDE_CODE='1', OPENCODE_DISABLE_EXTERNAL_SKILLS='1')
             command = ['opencode', 'run', '--format', 'json', '--standalone']
         else:
             # https://code.claude.com/docs/en/headless: safe mode keeps the saved login; bare mode does not.

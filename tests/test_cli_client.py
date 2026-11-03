@@ -18,6 +18,7 @@ if os.environ.get('FAKE_FAIL'):
     sys.exit(3)
 if sys.argv[0].endswith('opencode'):
     assert json.loads(os.environ['OPENCODE_CONFIG_CONTENT']) == {'permission': 'deny'}
+    assert os.environ['OPENCODE_PURE'] == '1' and os.path.realpath(os.environ['XDG_CONFIG_HOME']) == os.path.realpath(os.getcwd())
     print(os.environ.get('FAKE_OPENCODE', json.dumps({'type': 'text', 'part': {'type': 'text', 'text': 'reply'}})))
 elif '--output-last-message' in sys.argv:
     open(sys.argv[sys.argv.index('--output-last-message') + 1], 'w').write('reply')
