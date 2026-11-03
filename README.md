@@ -37,13 +37,13 @@ cd scripts
 bash run.sh
 ```
 
-### Using Claude Code or Codex CLI
-Use a logged-in `claude` or `codex` instead of an API key. No API key or `openai` package is needed.
+### Using Claude Code, Codex or OpenCode CLI
+Use a logged-in `claude`, `codex` or `opencode` instead of an API key. No API key or `openai` package is needed.
 
 ```bash
 pip install tqdm pyyaml
 cd scripts
-PAPER2CODE_BACKEND=claude bash run.sh   # or PAPER2CODE_BACKEND=codex
+PAPER2CODE_BACKEND=claude bash run.sh   # or PAPER2CODE_BACKEND=codex, or opencode
 ```
 
 The CLI's default model is used; set `PAPER2CODE_MODEL` to choose another (`--gpt_version` is ignored). Cost logs are skipped. All stages work the same way, including refinement, debugging and evaluation (which also need `huggingface_hub` and `tiktoken`).

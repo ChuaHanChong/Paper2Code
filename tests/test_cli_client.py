@@ -16,7 +16,10 @@ assert not os.environ.get('ANTHROPIC_API_KEY') and not os.environ.get('OPENAI_AP
 assert 'hello' in sys.stdin.read()
 if os.environ.get('FAKE_FAIL'):
     sys.exit(3)
-if '--output-last-message' in sys.argv:
+if sys.argv[0].endswith('opencode'):
+    assert json.loads(os.environ['OPENCODE_CONFIG_CONTENT']) == {'permission': 'deny'}
+    print(os.environ.get('FAKE_OPENCODE', json.dumps({'type': 'text', 'part': {'type': 'text', 'text': 'reply'}})))
+elif '--output-last-message' in sys.argv:
     open(sys.argv[sys.argv.index('--output-last-message') + 1], 'w').write('reply')
 else:
     print(json.dumps({'is_error': False, 'result': 'reply'}))
@@ -30,7 +33,7 @@ class CLIClient(unittest.TestCase):
         """Put fake CLIs first on PATH with API keys set."""
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        for name in ('codex', 'claude'):
+        for name in ('codex', 'claude', 'opencode'):
             path = Path(directory.name) / name
             path.write_text(FAKE)
             path.chmod(0o755)
@@ -45,7 +48,7 @@ class CLIClient(unittest.TestCase):
 
     def test_both_backends_return_the_openai_shape(self) -> None:
         """Expose choices, n replies and model_dump_json like the API."""
-        for backend in ('codex', 'claude'):
+        for backend in ('codex', 'claude', 'opencode'):
             completion = self.request(backend, n=2)
             self.assertEqual(completion.choices[1].message.content, 'reply')
             self.assertEqual(completion.choices[0].message.role, 'assistant')
@@ -55,6 +58,8 @@ class CLIClient(unittest.TestCase):
         """Never turn a failed CLI or a typo into an empty reply."""
         with mock.patch.dict(os.environ, {'FAKE_FAIL': '1'}), self.assertRaises(RuntimeError):
             self.request('claude')
+        with mock.patch.dict(os.environ, {'FAKE_OPENCODE': '{"type":"error"}'}), self.assertRaises(RuntimeError):
+            self.request('opencode')
         with self.assertRaises(ValueError):
             self.request('gemini')
 
