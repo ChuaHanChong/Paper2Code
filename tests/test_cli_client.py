@@ -46,7 +46,7 @@ class CLIClient(unittest.TestCase):
         with mock.patch.dict(os.environ, {'PAPER2CODE_BACKEND': backend}):
             return make_client().chat.completions.create(model='ignored', reasoning_effort='high', messages=[{'role': 'user', 'content': 'hello'}], **options)
 
-    def test_both_backends_return_the_openai_shape(self) -> None:
+    def test_cli_backends_return_the_openai_shape(self) -> None:
         """Expose choices, n replies and model_dump_json like the API."""
         for backend in ('codex', 'claude', 'opencode'):
             completion = self.request(backend, n=2)
@@ -58,7 +58,7 @@ class CLIClient(unittest.TestCase):
         """Never turn a failed CLI or a typo into an empty reply."""
         with mock.patch.dict(os.environ, {'FAKE_FAIL': '1'}), self.assertRaises(RuntimeError):
             self.request('claude')
-        with mock.patch.dict(os.environ, {'FAKE_OPENCODE': '{"type":"error"}'}), self.assertRaises(RuntimeError):
+        with mock.patch.dict(os.environ, {'FAKE_OPENCODE': '{"type":"text","part":{"type":"text","text":"partial"}}\n{"type":"error"}'}), self.assertRaises(RuntimeError):
             self.request('opencode')
         with self.assertRaises(ValueError):
             self.request('gemini')

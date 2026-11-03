@@ -67,13 +67,15 @@ def run_cli(backend: str, messages: list) -> str:
 
 
 def opencode_reply(stdout: str) -> str:
-    """Return the last text event of `opencode run --format json`; a provider error prints none."""
+    """Return the last text event of `opencode run --format json`, raising on an error event or no text."""
     texts = []
     for line in stdout.splitlines():
         try:
             event = json.loads(line)
         except ValueError:
             continue
+        if isinstance(event, dict) and event.get('type') == 'error':
+            raise RuntimeError(f'opencode failed: {line[-2000:]}')
         part = event.get('part') if isinstance(event, dict) else None
         if isinstance(part, dict) and part.get('type') == 'text' and isinstance(part.get('text'), str):
             texts.append(part['text'])
